@@ -70,15 +70,19 @@
                 position: fixed !important;
                 pointer-events: none;
             }
+            /* PC 상단 여백 늘림 */
+            .icons-container {
+                padding: 100px 30px 30px 30px;
+            }
         }
 
         @media (max-width: 768px) {
             .icons-container {
                 display: flex;
                 flex-wrap: wrap;
-                justify-content: flex-start;
-                gap: 15px;
-                padding: 100px 100px 100px 100px;  /* 상하좌우 100px 여백 */
+                justify-content: center;
+                gap: 12px;
+                padding: 90px 12px 20px 12px;
             }
             .desktop-icon {
                 position: relative !important;
@@ -227,7 +231,6 @@
             background: rgba(255,255,255,0.2);
         }
 
-        /* 동기화 버튼 스타일 */
         .sync-btn {
             background: rgba(59, 130, 246, 0.6);
             padding: 4px 10px;
@@ -377,6 +380,7 @@
             }
         }
 
+        /* 하단 탭바 - 기본은 숨김 */
         .taskbar {
             position: fixed;
             bottom: 0;
@@ -385,7 +389,7 @@
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(20px);
             padding: 6px 20px;
-            display: flex;
+            display: none;
             gap: 12px;
             border-top: 1px solid rgba(255,255,255,0.1);
             z-index: 1000;
@@ -393,6 +397,9 @@
             overflow-y: hidden;
             white-space: nowrap;
             scrollbar-width: thin;
+        }
+        .taskbar.visible {
+            display: flex;
         }
         .taskbar::-webkit-scrollbar {
             height: 4px;
@@ -714,7 +721,6 @@
         <div class="menu-item disabled" data-menu="wallpaper" id="wallpaperMenu">
             <i class="fa-solid fa-photo-film"></i><span>배경화면</span>
         </div>
-        <!-- 동기화 버튼 -->
         <div class="sync-btn" id="syncBtn">
             <i class="fas fa-cloud-upload-alt"></i><span>동기화</span>
         </div>
@@ -804,6 +810,7 @@
     const modalContainer = document.getElementById('modalContainer');
     const runningAppsDiv = document.getElementById('runningApps');
     const desktop = document.getElementById('desktop');
+    const taskbarElement = document.getElementById('taskbarContainer');
     
     let loadingDiv = null;
     function showLoading(text = "동기화 중...") {
@@ -1112,6 +1119,7 @@
         if (winData) {
             win.style.display = 'none';
             winData.isMinimized = true;
+            updateTaskbarVisibility();
             renderTaskbar();
         }
     }
@@ -1122,10 +1130,21 @@
             winData.element.style.display = 'flex';
             winData.isMinimized = false;
             winData.element.style.zIndex = ++highestZ;
+            updateTaskbarVisibility();
             renderTaskbar(windowId);
         } else if (winData) {
             winData.element.style.zIndex = ++highestZ;
             renderTaskbar(windowId);
+        }
+    }
+    
+    // 탭바 표시 여부 업데이트 (실행 중인 앱이 있으면 표시)
+    function updateTaskbarVisibility() {
+        const hasWindows = runningWindows.length > 0;
+        if (hasWindows) {
+            taskbarElement.classList.add('visible');
+        } else {
+            taskbarElement.classList.remove('visible');
         }
     }
     
@@ -1222,6 +1241,7 @@
         win.querySelector('.close-window').onclick = () => {
             win.remove();
             runningWindows = runningWindows.filter(w => w.windowId !== wid);
+            updateTaskbarVisibility();
             renderTaskbar();
         };
         
@@ -1234,6 +1254,7 @@
         };
         
         runningWindows.push({ id: app.id, windowId: wid, element: win, name: app.name, icon: app.icon, isMinimized: false });
+        updateTaskbarVisibility();
         renderTaskbar();
     }
     
@@ -1258,6 +1279,7 @@
                 e.stopPropagation();
                 win.element.remove();
                 runningWindows = runningWindows.filter(w => w.windowId !== win.windowId);
+                updateTaskbarVisibility();
                 renderTaskbar();
             };
             runningAppsDiv.appendChild(btn);
@@ -1380,7 +1402,6 @@
                 showToast('이미 최신 상태입니다');
             }
         } else {
-            // 클라우드에 데이터가 없으면 현재 상태 업로드
             await saveToJSONBin();
             showToast('☁️ 현재 상태를 클라우드에 저장했습니다');
         }
@@ -1549,6 +1570,8 @@
         if (urlSpan) {
             urlSpan.textContent = currentWallpaper || '없음';
         }
+        
+        updateTaskbarVisibility();
     }
     
     async function exportToJSON() {
@@ -1627,7 +1650,6 @@
         } 
     };
     
-    // 동기화 버튼 이벤트
     document.getElementById('syncBtn').onclick = manualSync;
     
     document.getElementById('submitPwBtn').onclick = () => {
