@@ -78,7 +78,7 @@
                 flex-wrap: wrap;
                 justify-content: flex-start;
                 gap: 15px;
-                padding: 70px 15px 15px 15px;
+                padding: 100px 100px 100px 100px;  /* 상하좌우 100px 여백 */
             }
             .desktop-icon {
                 position: relative !important;
@@ -227,6 +227,25 @@
             background: rgba(255,255,255,0.2);
         }
 
+        /* 동기화 버튼 스타일 */
+        .sync-btn {
+            background: rgba(59, 130, 246, 0.6);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sync-btn:hover {
+            background: #3b82f6;
+        }
+        .sync-btn i {
+            font-size: 12px;
+        }
+
         @media (min-width: 769px) {
             .menu-item span {
                 display: inline-block;
@@ -253,6 +272,12 @@
             }
             .apple-icon {
                 font-size: 16px;
+            }
+            .sync-btn span {
+                display: none;
+            }
+            .sync-btn {
+                padding: 4px 8px;
             }
         }
 
@@ -689,6 +714,10 @@
         <div class="menu-item disabled" data-menu="wallpaper" id="wallpaperMenu">
             <i class="fa-solid fa-photo-film"></i><span>배경화면</span>
         </div>
+        <!-- 동기화 버튼 -->
+        <div class="sync-btn" id="syncBtn">
+            <i class="fas fa-cloud-upload-alt"></i><span>동기화</span>
+        </div>
     </div>
     <div class="mac-right">
         <div class="weather-info" id="weatherInfo">
@@ -930,7 +959,7 @@
         }
     }
     
-    // ========== 드래그 함수 (개선됨) ==========
+    // ========== 드래그 함수 ==========
     function startDrag(clientX, clientY, element) {
         if (isMobile()) return;
         
@@ -1237,7 +1266,7 @@
         if (taskbarContainer) taskbarContainer.scrollLeft = taskbarContainer.scrollWidth;
     }
     
-    // 아이콘 초기 위치 계산 (겹치지 않게)
+    // 아이콘 초기 위치 계산 (격자 형태)
     function getDefaultIconPosition(index) {
         const cols = Math.floor((iconsContainer.clientWidth - 60) / 110);
         const col = index % Math.max(cols, 1);
@@ -1291,27 +1320,23 @@
             if (!isMobile()) {
                 wrapper.addEventListener('mousedown', onMouseDown);
                 
-                // 저장된 위치가 있으면 사용, 없으면 자동 계산
                 if (iconPositions[app.id]) {
                     iconDiv.style.position = 'absolute';
                     iconDiv.style.left = iconPositions[app.id].left;
                     iconDiv.style.top = iconPositions[app.id].top;
                     iconDiv.style.width = '90px';
                 } else {
-                    // 기본 위치 자동 계산 (겹치지 않게)
                     const defaultPos = getDefaultIconPosition(idx);
                     iconDiv.style.position = 'absolute';
                     iconDiv.style.left = defaultPos.left;
                     iconDiv.style.top = defaultPos.top;
                     iconDiv.style.width = '90px';
-                    // 저장
                     iconPositions[app.id] = defaultPos;
                 }
             }
             iconsContainer.appendChild(iconDiv);
         });
         
-        // 저장 (기본 위치 계산된 것도 저장)
         if (!isMobile()) {
             localStorage.setItem('webapps_positions', JSON.stringify(iconPositions));
         }
@@ -1326,6 +1351,41 @@
             }
         }
     });
+    
+    // 수동 동기화 함수
+    async function manualSync() {
+        if (!isLoggedIn) {
+            showToast('로그인이 필요합니다');
+            return;
+        }
+        showLoading("클라우드 동기화 중...");
+        const cloudData = await loadFromJSONBin();
+        if (cloudData) {
+            let changed = false;
+            if (cloudData.programs && cloudData.programs.length > 0) {
+                programs = cloudData.programs;
+                localStorage.setItem('webapps', JSON.stringify(programs));
+                changed = true;
+            }
+            if (cloudData.wallpaper && cloudData.wallpaper !== 'null') {
+                localStorage.setItem('desktopWallpaper', cloudData.wallpaper);
+                loadWallpaper();
+                if (!changed) showToast('☁️ 배경화면 동기화 완료');
+                changed = true;
+            }
+            if (changed) {
+                renderDesktop();
+                showToast('☁️ 클라우드 동기화 완료');
+            } else {
+                showToast('이미 최신 상태입니다');
+            }
+        } else {
+            // 클라우드에 데이터가 없으면 현재 상태 업로드
+            await saveToJSONBin();
+            showToast('☁️ 현재 상태를 클라우드에 저장했습니다');
+        }
+        hideLoading();
+    }
     
     // 화면 크기 변경 감지
     let resizeTimeout;
@@ -1566,6 +1626,9 @@
             showModal('wallpaperModal'); 
         } 
     };
+    
+    // 동기화 버튼 이벤트
+    document.getElementById('syncBtn').onclick = manualSync;
     
     document.getElementById('submitPwBtn').onclick = () => {
         const pw = document.getElementById('passwordInput').value;
